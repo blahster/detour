@@ -1,0 +1,11 @@
+# Copy to Config.local and fill in. Config.local is read by build.sh.
+
+# Team ID: developer.apple.com > Account > Membership details (10 characters).
+DEVELOPMENT_TEAM=XXXXXXXXXX
+
+# Any reverse-DNS id that is unique to you. Register this App ID with MusicKit ticked (see README).
+BUNDLE_ID=com.yourname.detour
+
+# Only needed for `./build.sh dist` (sharing with friends). The name you give
+# `xcrun notarytool store-credentials` (see README).
+NOTARY_PROFILE=detour-notary
