@@ -202,7 +202,7 @@ Host the zip as a **GitHub Release** asset rather than committing it to the repo
 | `Sources/Detour/AppDelegate.swift`, `DropPad.swift`, `PopupPanel.swift`, `DropView.swift` | Status item, drop pad, popup                                                                                                                         |
 | `Sources/Detour/PopoverView.swift`                                                        | SwiftUI popup content                                                                                                                                |
 | `Sources/Detour/Assets.xcassets/`                                                         | App icon set (all macOS sizes)                                                                                                                       |
-| `Design/`                                                                                 | `AppIcon-1024.png` is the icon master (transparent corners); `make_icon_set.py` regenerates every size from it into the asset catalog (needs Pillow) |
+| `Design/`                                                                                 | `AppIcon-1024.png` is the icon master (transparent corners); `make_icon_set.sh` regenerates every size from it into the asset catalog (uses the built-in sips tool) |
 | `Tests/main.swift`                                                                        | Plain-assertion test runner (no XCTest needed)                                                                                                       |
 | `project.yml`                                                                             | XcodeGen project definition                                                                                                                          |
 | `Config/Detour.entitlements`                                                              | Entitlements used only for distribution builds                                                                                                       |
@@ -254,7 +254,7 @@ notarization credentials as encrypted repository secrets, never in the repo.
 | "Only the Account Holder..." when creating a certificate in Xcode       | Use the command-line route in the sharing section.                                                                      |
 | `get-task-allow` notarization error                                     | Already handled in `build.sh dist` (`CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO`). The script also checks before submitting. |
 | Notarization rejected                                                   | Run the `notarytool log` command that `build.sh` prints; the log says exactly why.                                      |
-| Icon stays a waveform after a song ends                                 | End-of-queue detection depends on MusicKit's reported state. Open an issue with your macOS version.                     |
+| Popup still shows a song after it ended | End-of-song detection depends on what MusicKit reports. Please open an issue with your macOS version. |
 | Drop pad never appears                                                  | The source app may not put plain text on the drag pasteboard. Dragging files is ignored on purpose.                     |
 
 ## Known limitations

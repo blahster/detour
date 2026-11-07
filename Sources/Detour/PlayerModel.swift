@@ -11,7 +11,6 @@ final class PlayerModel: ObservableObject {
     enum State {
         case idle
         case choosing([Candidate])
-        case playing(Candidate)
         case notice(String, NoticeAction?)
     }
 
@@ -22,20 +21,23 @@ final class PlayerModel: ObservableObject {
     @Published var duration: Double = 0
     @Published var musicAppPlaying = false
     @Published var hasActivePlayback = false
+    /// The song currently playing. Independent of `state`, so its controls stay visible while
+    /// candidates or a notice are showing.
+    @Published var nowPlaying: Candidate?
     @Published var launchAtLogin = (SMAppService.mainApp.status == .enabled)
 
     /// Set by the AppDelegate.
     var onNeedsAttention: (() -> Void)?
-    var onIconChange: ((_ playing: Bool, _ tooltip: String?) -> Void)?
 
     private let resolver = CatalogResolver()
     private let player = ApplicationMusicPlayer.shared
-    private var current: Candidate?
     private var searchTask: Task<Void, Never>?
     private var playTask: Task<Void, Never>?
     private var ticker: Timer?
     private var popoverVisible = false
     private var hasStartedPlaying = false
+    private var expectedEnd: Date?
+    private var endWatchdog: Timer?
     private var stateSink: AnyCancellable?
 
     init() {
@@ -117,14 +119,16 @@ final class PlayerModel: ObservableObject {
             return
         }
         playTask?.cancel()
-        current = c
-        state = .playing(c)
+        nowPlaying = c
+        state = .idle                  // clears any choices or notice that led here
         isPaused = false
         position = 0
         duration = Double(c.durationMs ?? 0) / 1000
         hasActivePlayback = true
         hasStartedPlaying = false
-        onIconChange?(true, "\(c.title) \u{2014} \(c.artist)")
+        expectedEnd = nil
+        endWatchdog?.invalidate()
+        endWatchdog = nil
 
         refreshMusicApp()
         if musicAppPlaying { onNeedsAttention?() }
@@ -154,30 +158,90 @@ final class PlayerModel: ObservableObject {
     func stop() {
         playTask?.cancel()
         player.stop()
+        if case .notice = state { state = .idle }     // keep any candidates the user is still choosing from
         finish()
     }
 
+    func dismissChoices() {
+        if case .choosing = state { state = .idle }
+    }
+
     private func finish() {
-        current = nil
+        nowPlaying = nil
         hasActivePlayback = false
         hasStartedPlaying = false
         isPaused = false
-        state = .idle
-        onIconChange?(false, nil)
+        expectedEnd = nil
+        endWatchdog?.invalidate()
+        endWatchdog = nil
         updateTicker()
     }
 
+    // MARK: - Noticing the end of the song
+    //
+    // When a one-song queue runs out, MusicKit may report .paused or .stopped, and playbackTime may
+    // already have reset. So we do not trust either on its own: every time we see "playing" we note
+    // when the song should end, and treat a pause/stop that arrives at about that time as the end.
+    // A one-shot timer set for that moment backs it up if no status event arrives at all.
+
     private func syncState() {
         guard hasActivePlayback else { return }
-        switch player.state.playbackStatus {
+        let status = player.state.playbackStatus
+        switch status {
         case .playing:
             hasStartedPlaying = true
             isPaused = false
+            armEndWatchdog()
         case .paused, .interrupted:
             isPaused = true
-            if hasStartedPlaying, duration > 0, player.playbackTime >= duration - 1 { stop() }
+            if hasStartedPlaying, reachedEnd() {
+                stop()
+            }
         case .stopped:
-            if hasStartedPlaying { finish() }      // reached the end of the one-song queue
+            if hasStartedPlaying {
+                finish()
+            }
+        default:
+            break
+        }
+    }
+
+    private func reachedEnd() -> Bool {
+        guard duration > 0 else { return false }
+        if player.playbackTime >= duration - 3 { return true }
+        if let e = expectedEnd, Date() >= e.addingTimeInterval(-3) { return true }
+        return false
+    }
+
+    private func armEndWatchdog() {
+        guard duration > 0 else { return }
+        let end = Date().addingTimeInterval(max(duration - player.playbackTime, 0))
+        if endWatchdog != nil, let e = expectedEnd, abs(e.timeIntervalSince(end)) < 1.5 { return }
+        expectedEnd = end
+        endWatchdog?.invalidate()
+        endWatchdog = Timer.scheduledTimer(withTimeInterval: max(end.timeIntervalSinceNow, 0) + 2, repeats: false) { [weak self] _ in
+            Task { @MainActor in self?.watchdogFired() }
+        }
+    }
+
+    private func watchdogFired() {
+        endWatchdog = nil
+        guard hasActivePlayback, hasStartedPlaying else { return }
+        let t = player.playbackTime
+        switch player.state.playbackStatus {
+        case .playing:
+            if t < duration - 3 {              // seeked back or resumed: not over yet
+                expectedEnd = nil
+                armEndWatchdog()
+            } else {
+                stop()
+            }
+        case .paused, .interrupted:
+            if reachedEnd() {
+                stop()
+            }                                   // otherwise the user paused mid-song: leave it
+        case .stopped:
+            finish()
         default:
             break
         }

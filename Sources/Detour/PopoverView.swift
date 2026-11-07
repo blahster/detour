@@ -7,13 +7,15 @@ struct PopoverView: View {
         VStack(alignment: .leading, spacing: 10) {
             if model.musicAppPlaying { musicBanner }
 
+            // The current song's controls stay put; choices and notices appear below them.
+            if let c = model.nowPlaying { nowPlaying(c) }
+
             switch model.state {
             case .idle:
-                idle
+                if model.nowPlaying == nil { idle }
             case .choosing(let candidates):
+                if model.nowPlaying != nil { Divider() }
                 choosing(candidates)
-            case .playing(let c):
-                nowPlaying(c)
             case .notice(let message, let action):
                 notice(message, action)
             }
@@ -44,7 +46,14 @@ struct PopoverView: View {
 
     private func choosing(_ candidates: [Candidate]) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("Which one?").font(.headline)
+            HStack {
+                Text(model.nowPlaying == nil ? "Which one?" : "Play instead?").font(.headline)
+                Spacer()
+                Button("Cancel") { model.dismissChoices() }
+                    .buttonStyle(.borderless)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
             ForEach(candidates) { c in
                 Button { model.play(c) } label: {
                     HStack(spacing: 8) {
@@ -113,9 +122,6 @@ struct PopoverView: View {
 
     private var footer: some View {
         HStack(spacing: 12) {
-            if model.hasActivePlayback, !isPlayingState {
-                Button("Stop") { model.stop() }
-            }
             Toggle("Launch at login", isOn: Binding(
                 get: { model.launchAtLogin },
                 set: { model.setLaunchAtLogin($0) }
@@ -130,11 +136,6 @@ struct PopoverView: View {
     }
 
     // MARK: - Helpers
-
-    private var isPlayingState: Bool {
-        if case .playing = model.state { return true }
-        return false
-    }
 
     private func artwork(_ url: URL?, size: CGFloat) -> some View {
         AsyncImage(url: url) { image in

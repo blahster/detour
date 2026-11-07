@@ -12,7 +12,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         guard let button = statusItem.button else { return }
 
-        setIcon(playing: false, tooltip: "Detour: drop a song title here")
+        button.image = NSImage(systemSymbolName: "music.note", accessibilityDescription: "Detour")
         button.target = self
         button.action = #selector(togglePopup)
 
@@ -34,16 +34,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         pad.start()
 
         model.onNeedsAttention = { [weak self] in self?.popup.show() }
-        model.onIconChange = { [weak self] playing, tip in
-            self?.setIcon(playing: playing, tooltip: tip ?? "Detour: drop a song title here")
-        }
-    }
-
-    private func setIcon(playing: Bool, tooltip: String) {
-        guard let button = statusItem.button else { return }
-        let name = playing ? "waveform" : "music.note"
-        button.image = NSImage(systemSymbolName: name, accessibilityDescription: "Detour")
-        button.toolTip = tooltip
     }
 
     @objc private func togglePopup() { popup.toggle() }

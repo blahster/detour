@@ -19,8 +19,8 @@ targets:
         CFBundleIdentifier: $(PRODUCT_BUNDLE_IDENTIFIER)
         CFBundleExecutable: $(EXECUTABLE_NAME)
         CFBundlePackageType: APPL
-        CFBundleShortVersionString: "0.2"
-        CFBundleVersion: "2"
+        CFBundleShortVersionString: "0.2.1"
+        CFBundleVersion: "3"
         LSMinimumSystemVersion: $(MACOSX_DEPLOYMENT_TARGET)
         LSUIElement: true
         NSAppleMusicUsageDescription: Detour plays the songs you drop on it from your Apple Music subscription.
